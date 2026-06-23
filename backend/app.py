@@ -19,10 +19,11 @@ import asyncio
 from typing import Any, Optional
 
 import httpx
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Header, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from lcu import LcuCredentials, get_champion_names, make_client, read_lockfile
+from riot import fetch_mastery
 
 app = FastAPI(title="LoL Draft Companion", version="1.0.0")
 
@@ -155,6 +156,21 @@ def draft_state() -> dict[str, Any]:
     """Polling endpoint — returns the current (or fallback) draft state."""
 
     return get_draft_state()
+
+
+@app.get("/api/riot/mastery")
+def riot_mastery(
+    riotId: str = "",
+    region: str = "NA",
+    x_riot_key: str = Header(default=""),
+) -> dict[str, Any]:
+    """Proxy the Riot Web API to fetch a player's top champion masteries.
+
+    The developer key is passed in the ``X-Riot-Key`` header (never persisted).
+    Used by the profile setup UI to *suggest* the user's mains; fail-soft.
+    """
+
+    return fetch_mastery(x_riot_key, riotId, region)
 
 
 @app.websocket("/ws/draft-state")

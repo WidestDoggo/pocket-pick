@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ROLES } from "./champions.js";
+import { ROLES, ROLE_LABELS, estimateRole } from "./champions.js";
 import { recommend } from "./DraftEngine.js";
 import { useDraftSync } from "./useDraftSync.js";
 import { ChampionIcon } from "./components/ChampionIcon.jsx";
@@ -9,6 +9,7 @@ import { Recommendations } from "./components/Recommendations.jsx";
 
 const PROFILE_KEY = "lol-draft-companion:profile";
 const MODE_KEY = "lol-draft-companion:mode";
+const MY_PICK_KEY = "lol-draft-companion:myPick";
 
 const EMPTY_PROFILE = {
   mains: { TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: [] },
@@ -31,13 +32,16 @@ function loadProfile() {
   }
 }
 
-// Convert the backend's live slot payload into the {name, riotId} shape the
-// rest of the app uses.
+// Convert the backend's live slot payload into the {name, riotId, role} shape
+// the rest of the app uses. Roles are estimated greedily in pick order.
 function liveTeamToBoard(slots) {
+  const used = [];
   return Array.from({ length: 5 }, (_, i) => {
     const cell = slots?.[i];
     if (!cell || !cell.championName) return null;
-    return { name: cell.championName, riotId: cell.championId };
+    const role = estimateRole({ name: cell.championName, riotId: cell.championId }, used);
+    if (role) used.push(role);
+    return { name: cell.championName, riotId: cell.championId, role };
   });
 }
 
@@ -49,6 +53,13 @@ export default function App() {
   // Manual-mode boards (local, editable).
   const [manualBlue, setManualBlue] = useState(emptyTeam);
   const [manualRed, setManualRed] = useState(emptyTeam);
+
+  // Which Blue pick slot is "mine" (manual mode). null = none designated.
+  const [myPickIndex, setMyPickIndex] = useState(() => {
+    const raw = localStorage.getItem(MY_PICK_KEY);
+    const n = raw == null ? NaN : Number(raw);
+    return Number.isInteger(n) && n >= 0 && n < 5 ? n : null;
+  });
 
   // Modal state for manual champion selection.
   const [modal, setModal] = useState(null); // { team, slot } | null
@@ -63,6 +74,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(MODE_KEY, mode);
   }, [mode]);
+  useEffect(() => {
+    if (myPickIndex == null) localStorage.removeItem(MY_PICK_KEY);
+    else localStorage.setItem(MY_PICK_KEY, String(myPickIndex));
+  }, [myPickIndex]);
 
   // The board shown + analyzed depends on the active mode.
   const blue = isLive ? liveTeamToBoard(liveState.blue) : manualBlue;
@@ -94,10 +109,82 @@ export default function App() {
     const setter = modal.team === "blue" ? setManualBlue : setManualRed;
     setter((prev) => {
       const next = [...prev];
-      next[modal.slot] = { name: champ.name, riotId: champ.riotId };
+      // Auto-estimate the role from the champion + roles already on this team
+      // (the user can override it via the per-slot dropdown).
+      const used = next
+        .filter((s, i) => s && i !== modal.slot)
+        .map((s) => s.role)
+        .filter(Boolean);
+      const role = estimateRole(champ, used);
+      next[modal.slot] = { name: champ.name, riotId: champ.riotId, role };
       return next;
     });
+    // Auto-sync "Your role" when filling your own designated pick slot.
+    if (modal.team === "blue" && modal.slot === myPickIndex) {
+      const used = manualBlue
+        .filter((s, i) => s && i !== modal.slot)
+        .map((s) => s.role)
+        .filter(Boolean);
+      const role = estimateRole(champ, used);
+      if (role) setMyRole(role);
+    }
     setModal(null);
+  };
+
+  const setSlotRole = (team, slot, role) => {
+    if (isLive) return;
+    const setter = team === "blue" ? setManualBlue : setManualRed;
+    setter((prev) => {
+      const next = [...prev];
+      if (next[slot]) next[slot] = { ...next[slot], role };
+      return next;
+    });
+    // One source of truth: editing your own slot's role updates "Your role".
+    if (team === "blue" && slot === myPickIndex && role) setMyRole(role);
+  };
+
+  // --- "My pick" handlers ---------------------------------------------------
+  // Designate which Blue slot is mine; adopt its role if it already has one.
+  const setMyPick = (slot) => {
+    if (isLive) return;
+    setMyPickIndex((prev) => (prev === slot ? null : slot));
+    const slotRole = manualBlue[slot]?.role;
+    if (slotRole) setMyRole(slotRole);
+  };
+
+  // "Your role" selector — also mirror onto the designated slot (if filled).
+  const changeMyRole = (role) => {
+    setMyRole(role);
+    if (myPickIndex != null && manualBlue[myPickIndex]) {
+      setSlotRole("blue", myPickIndex, role);
+    }
+  };
+
+  // Fill the designated slot with a recommended champion.
+  const fillMyPick = (rec) => {
+    if (isLive || myPickIndex == null) return;
+    setManualBlue((prev) => {
+      const next = [...prev];
+      const used = next
+        .filter((s, i) => s && i !== myPickIndex)
+        .map((s) => s.role)
+        .filter(Boolean);
+      const role = myRole || estimateRole(rec, used);
+      next[myPickIndex] = { name: rec.name, riotId: rec.riotId, role };
+      return next;
+    });
+  };
+
+  // Swap my pick position with another Blue slot — champions trade places and
+  // the "YOU" marker follows me to the new position (mirrors a champ-select swap).
+  const swapPick = (targetSlot) => {
+    if (isLive || myPickIndex == null || targetSlot === myPickIndex) return;
+    setManualBlue((prev) => {
+      const next = [...prev];
+      [next[myPickIndex], next[targetSlot]] = [next[targetSlot], next[myPickIndex]];
+      return next;
+    });
+    setMyPickIndex(targetSlot);
   };
 
   const clearSlot = () => {
@@ -114,6 +201,7 @@ export default function App() {
   const resetManual = () => {
     setManualBlue(emptyTeam());
     setManualRed(emptyTeam());
+    setMyPickIndex(null);
   };
 
   const statusBadge = () => {
@@ -177,21 +265,26 @@ export default function App() {
         <div className="teams">
           <TeamColumn
             title="Blue Team"
-            subtitle="Allies"
+            subtitle="Allies · set your teammates' roles"
             color="blue"
             slots={blue}
             readOnly={isLive}
             onSlotClick={(slot) => openSlot("blue", slot)}
+            onRoleChange={(slot, role) => setSlotRole("blue", slot, role)}
             highlightSelf={isLive ? liveState.blue : null}
+            myPickIndex={isLive ? null : myPickIndex}
+            onSetMyPick={isLive ? null : setMyPick}
+            onSwap={isLive ? null : swapPick}
           />
           <div className="versus">VS</div>
           <TeamColumn
             title="Red Team"
-            subtitle="Enemies"
+            subtitle="Enemies · roles auto-estimated"
             color="red"
             slots={red}
             readOnly={isLive}
             onSlotClick={(slot) => openSlot("red", slot)}
+            onRoleChange={(slot, role) => setSlotRole("red", slot, role)}
             highlightSelf={isLive ? liveState.red : null}
           />
         </div>
@@ -199,9 +292,11 @@ export default function App() {
         <Recommendations
           result={result}
           myRole={myRole}
-          onRoleChange={setMyRole}
+          onRoleChange={changeMyRole}
           roles={ROLES}
           profileEmpty={profileEmpty}
+          onPick={isLive ? null : fillMyPick}
+          myPickSet={!isLive && myPickIndex != null}
         />
       </main>
 
@@ -235,8 +330,20 @@ export default function App() {
   );
 }
 
-function TeamColumn({ title, subtitle, color, slots, readOnly, onSlotClick, highlightSelf }) {
-  const roleLabels = ["Top", "Jungle", "Mid", "Bot", "Support"];
+function TeamColumn({
+  title,
+  subtitle,
+  color,
+  slots,
+  readOnly,
+  onSlotClick,
+  onRoleChange,
+  highlightSelf,
+  myPickIndex = null,
+  onSetMyPick = null,
+  onSwap = null,
+}) {
+  const canMark = !readOnly && typeof onSetMyPick === "function";
   return (
     <section className={`team-column ${color}`}>
       <header className="team-header">
@@ -245,9 +352,21 @@ function TeamColumn({ title, subtitle, color, slots, readOnly, onSlotClick, high
       </header>
       <ul className="slot-list">
         {slots.map((champ, i) => {
-          const isSelf = highlightSelf?.[i]?.isSelf;
+          // "YOU" comes from live self-detection, or the manually designated pick.
+          const isSelf = highlightSelf?.[i]?.isSelf || i === myPickIndex;
+          const hasMyPick = myPickIndex != null;
           return (
-            <li key={i}>
+            <li key={i} className="slot-row">
+              {canMark && (
+                <button
+                  className={`set-pick-btn ${i === myPickIndex ? "active" : ""}`}
+                  onClick={() => onSetMyPick(i)}
+                  title={i === myPickIndex ? "This is your pick (click to clear)" : "Set as my pick"}
+                  aria-pressed={i === myPickIndex}
+                >
+                  {i === myPickIndex ? "★" : "☆"}
+                </button>
+              )}
               <button
                 className={`draft-slot ${champ ? "filled" : "empty"} ${
                   readOnly ? "readonly" : ""
@@ -257,13 +376,45 @@ function TeamColumn({ title, subtitle, color, slots, readOnly, onSlotClick, high
               >
                 <ChampionIcon name={champ?.name} size={48} />
                 <div className="slot-text">
-                  <span className="slot-role">{roleLabels[i]}</span>
+                  <span className="slot-role">Pick {i + 1}</span>
                   <span className="slot-name">
                     {champ ? champ.name : readOnly ? "—" : "Empty · click to pick"}
                   </span>
                 </div>
                 {isSelf && <span className="you-badge">YOU</span>}
               </button>
+
+              {canMark && hasMyPick && i !== myPickIndex && (
+                <button
+                  className="swap-btn"
+                  onClick={() => onSwap(i)}
+                  title="Swap your pick position with this slot"
+                  aria-label={`Swap your pick position with Pick ${i + 1}`}
+                >
+                  ⇄
+                </button>
+              )}
+
+              {champ &&
+                (readOnly ? (
+                  <span className="role-tag" title="Estimated role">
+                    {ROLE_LABELS[champ.role] || "?"}
+                  </span>
+                ) : (
+                  <select
+                    className="slot-role-select"
+                    value={champ.role || ""}
+                    onChange={(e) => onRoleChange(i, e.target.value)}
+                    title="Role"
+                  >
+                    {!champ.role && <option value="">Role…</option>}
+                    {ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                ))}
             </li>
           );
         })}

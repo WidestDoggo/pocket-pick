@@ -1,6 +1,13 @@
-import React, { useRef, useState } from "react";
-import { CHAMPIONS, ROLES } from "../champions.js";
+import React, { useEffect, useRef, useState } from "react";
+import { CHAMPIONS, ROLES, ROLE_LABELS, findChampion } from "../champions.js";
 import { ARCHETYPES } from "../DraftEngine.js";
+import { fetchMastery } from "../riotImport.js";
+import { ChampionIcon } from "./ChampionIcon.jsx";
+
+const RIOT_KEY_KEY = "lol-draft-companion:riotKey";
+const RIOT_ID_KEY = "lol-draft-companion:riotId";
+const RIOT_REGION_KEY = "lol-draft-companion:region";
+const REGIONS = ["NA", "EUW", "EUNE", "KR", "BR", "JP", "LAN", "LAS", "OCE", "TR", "RU"];
 
 // Datalist of all champion names — reused for the various name inputs.
 function ChampionDatalist({ id }) {
@@ -26,14 +33,53 @@ export function ProfilePanel({ profile, setProfile }) {
   const [pickArchetype, setPickArchetype] = useState(ARCHETYPES[0]);
   const fileRef = useRef(null);
 
-  const addMain = (role) => {
-    const name = (mainDrafts[role] || "").trim();
+  // --- Riot mastery import (profile setup helper) --------------------------
+  const [riotKey, setRiotKey] = useState(() => localStorage.getItem(RIOT_KEY_KEY) || "");
+  const [riotId, setRiotId] = useState(() => localStorage.getItem(RIOT_ID_KEY) || "");
+  const [region, setRegion] = useState(() => localStorage.getItem(RIOT_REGION_KEY) || "NA");
+  const [importState, setImportState] = useState({
+    loading: false,
+    error: null,
+    suggestions: null,
+  });
+  // Per-suggestion chosen role (keyed by championId), defaults to primary role.
+  const [roleChoice, setRoleChoice] = useState({});
+
+  useEffect(() => localStorage.setItem(RIOT_KEY_KEY, riotKey), [riotKey]);
+  useEffect(() => localStorage.setItem(RIOT_ID_KEY, riotId), [riotId]);
+  useEffect(() => localStorage.setItem(RIOT_REGION_KEY, region), [region]);
+
+  const runImport = async () => {
+    setImportState({ loading: true, error: null, suggestions: null });
+    try {
+      const data = await fetchMastery({ apiKey: riotKey.trim(), riotId: riotId.trim(), region });
+      const suggestions = data.champions.map((c) => ({
+        championId: c.championId,
+        points: c.championPoints,
+        champ: findChampion({ riotId: c.championId }), // null if not in dataset
+      }));
+      setImportState({ loading: false, error: null, suggestions });
+    } catch (e) {
+      setImportState({ loading: false, error: e.message || "Import failed", suggestions: null });
+    }
+  };
+
+  const isMain = (role, name) =>
+    (profile.mains[role] || []).some((n) => n.toLowerCase() === name.toLowerCase());
+
+  const addMainNamed = (role, name) => {
     if (!name) return;
     setProfile((p) => {
       const current = p.mains[role] || [];
       if (current.some((n) => n.toLowerCase() === name.toLowerCase())) return p;
       return { ...p, mains: { ...p.mains, [role]: [...current, name] } };
     });
+  };
+
+  const addMain = (role) => {
+    const name = (mainDrafts[role] || "").trim();
+    if (!name) return;
+    addMainNamed(role, name);
     setMainDrafts((d) => ({ ...d, [role]: "" }));
   };
 
@@ -104,6 +150,101 @@ export function ProfilePanel({ profile, setProfile }) {
       {open && (
         <div className="profile-body">
           <ChampionDatalist id="champ-names" />
+
+          <div className="profile-section riot-import">
+            <h3>Import from Riot (mastery)</h3>
+            <p className="muted">
+              Pull your most-played champions and add them as mains with one click.
+              Needs the backend running. Your key is stored only in this browser.
+            </p>
+            <div className="riot-fields">
+              <input
+                type="password"
+                placeholder="Riot API key (RGAPI-…)"
+                value={riotKey}
+                onChange={(e) => setRiotKey(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <input
+                placeholder="GameName#TAG"
+                value={riotId}
+                onChange={(e) => setRiotId(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && runImport()}
+              />
+              <select value={region} onChange={(e) => setRegion(e.target.value)}>
+                {REGIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="btn small"
+                onClick={runImport}
+                disabled={importState.loading || !riotKey.trim() || !riotId.trim()}
+              >
+                {importState.loading ? "Loading…" : "Fetch"}
+              </button>
+            </div>
+            <p className="riot-hint muted">
+              No key? Get one at{" "}
+              <a href="https://developer.riotgames.com/" target="_blank" rel="noreferrer">
+                developer.riotgames.com
+              </a>{" "}
+              — note dev keys expire every ~24h.
+            </p>
+
+            {importState.error && <p className="riot-error">{importState.error}</p>}
+
+            {importState.suggestions && (
+              <ul className="mastery-list">
+                {importState.suggestions.map((s) => {
+                  if (!s.champ) {
+                    return (
+                      <li key={s.championId} className="mastery-row unknown">
+                        <span className="muted">
+                          Champion #{s.championId} · {s.points.toLocaleString()} pts — not in
+                          the app's dataset yet
+                        </span>
+                      </li>
+                    );
+                  }
+                  const roles = s.champ.roles;
+                  const chosen = roleChoice[s.championId] || roles[0];
+                  const already = isMain(chosen, s.champ.name);
+                  return (
+                    <li key={s.championId} className="mastery-row">
+                      <ChampionIcon name={s.champ.name} size={36} />
+                      <div className="mastery-info">
+                        <strong>{s.champ.name}</strong>
+                        <span className="muted">{s.points.toLocaleString()} pts</span>
+                      </div>
+                      <select
+                        value={chosen}
+                        onChange={(e) =>
+                          setRoleChoice((rc) => ({ ...rc, [s.championId]: e.target.value }))
+                        }
+                      >
+                        {roles.map((r) => (
+                          <option key={r} value={r}>
+                            {ROLE_LABELS[r]}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn small"
+                        disabled={already}
+                        onClick={() => addMainNamed(chosen, s.champ.name)}
+                      >
+                        {already ? "Added ✓" : "Add main"}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
 
           <div className="profile-section">
             <h3>Mains by Role</h3>

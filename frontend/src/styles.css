@@ -293,6 +293,77 @@ body {
   gap: 10px;
 }
 
+/* ---------- Riot mastery import ------------------------------------------- */
+.riot-import {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--bg-2);
+}
+.riot-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.riot-fields input,
+.riot-fields select {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  outline: none;
+}
+.riot-fields input { flex: 1; min-width: 140px; }
+.riot-fields input:focus { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue-glow); }
+.riot-hint { margin: 8px 0 0; font-size: 11px; }
+.riot-hint a { color: var(--accent); }
+.riot-error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: #fca5a5;
+}
+
+.mastery-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mastery-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+.mastery-row.unknown {
+  border-style: dashed;
+  background: transparent;
+}
+.mastery-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.mastery-info strong { font-size: 13px; }
+.mastery-info .muted { font-size: 11px; }
+.mastery-row select {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
 /* ---------- Buttons ------------------------------------------------------- */
 .btn {
   background: linear-gradient(180deg, #2563eb, #1d4ed8);
@@ -435,6 +506,67 @@ body {
   border-radius: 5px;
 }
 
+/* Pick-order row: the slot button + its role control sit side by side. */
+.slot-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.slot-row .draft-slot { flex: 1; min-width: 0; }
+
+/* "Set as my pick" star toggle + position-swap button. */
+.set-pick-btn,
+.swap-btn {
+  flex: 0 0 auto;
+  align-self: center;
+  background: var(--bg-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 9px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.set-pick-btn:hover,
+.swap-btn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.set-pick-btn.active {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: rgba(200, 165, 88, 0.16);
+}
+
+.slot-role-select {
+  flex: 0 0 auto;
+  align-self: center;
+  background: var(--bg-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.slot-role-select:hover { border-color: var(--accent); }
+
+.role-tag {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+
 .board-actions {
   margin-top: 14px;
   display: flex;
@@ -520,6 +652,41 @@ body {
 }
 .source-badge.main { color: var(--gold); }
 .reco-reason { margin: 4px 0 0; font-size: 12.5px; color: #c7d0e2; line-height: 1.45; }
+
+.reco-hint { margin: 0 0 12px; font-size: 12px; }
+
+/* Actionable recommendation: the whole card becomes a click-to-fill button. */
+.reco-card-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.reco-card:has(.reco-card-btn) { transition: transform 0.12s, border-color 0.12s; }
+.reco-card:has(.reco-card-btn:hover) {
+  transform: translateY(-1px);
+  border-color: var(--gold);
+}
+.reco-use {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 6px;
+}
+.reco-card-btn:hover .reco-use { color: var(--gold); border-color: var(--gold); }
 
 .analysis-block {
   border-top: 1px solid var(--border);

@@ -180,25 +180,16 @@ function buildReason(candidate, topNeed, analysis) {
 }
 
 /**
- * Produce the top recommendations for the player.
+ * Build the candidate pool strictly from the user's profile (Mains for their
+ * role + Pocket Picks), excluding anything already drafted on either team.
  *
- * @param {Object}   opts
- * @param {Array}    opts.blue        Ally slots (5) — {riotId?,name?}|null.
- * @param {Array}    opts.red         Enemy slots (5).
- * @param {Object}   opts.profile     { mains: {ROLE:[name]}, pocketPicks:[{name,archetype}] }
- * @param {string}   opts.myRole      The player's role, e.g. "MID".
- * @param {number}   [opts.limit=2]   How many recommendations to return.
- * @returns {{ analysis, recommendations: Array }}
+ * @returns {Array<{champion, source: "main"|"pocket", archetype: string|null}>}
  */
-export function recommend({ blue, red, profile, myRole, limit = 2 }) {
-  const analysis = analyzeDraft(blue, red);
-
-  // Names already on the board (either team) are unavailable to pick.
+export function buildPool({ blue, red, profile, myRole }) {
   const taken = new Set(
     [...resolveTeam(blue), ...resolveTeam(red)].map((c) => c.name.toLowerCase()),
   );
 
-  // Assemble the candidate pool strictly from the user's profile.
   const pool = [];
   const seen = new Set();
 
@@ -212,9 +203,26 @@ export function recommend({ blue, red, profile, myRole, limit = 2 }) {
     pool.push({ champion, source, archetype });
   };
 
-  const mains = (profile?.mains?.[myRole] || []);
-  mains.forEach((n) => addCandidate(n, "main", null));
+  (profile?.mains?.[myRole] || []).forEach((n) => addCandidate(n, "main", null));
   (profile?.pocketPicks || []).forEach((p) => addCandidate(p.name, "pocket", p.archetype));
+
+  return pool;
+}
+
+/**
+ * Produce the top recommendations for the player.
+ *
+ * @param {Object}   opts
+ * @param {Array}    opts.blue        Ally slots (5) — {riotId?,name?}|null.
+ * @param {Array}    opts.red         Enemy slots (5).
+ * @param {Object}   opts.profile     { mains: {ROLE:[name]}, pocketPicks:[{name,archetype}] }
+ * @param {string}   opts.myRole      The player's role, e.g. "MID".
+ * @param {number}   [opts.limit=2]   How many recommendations to return.
+ * @returns {{ analysis, recommendations: Array }}
+ */
+export function recommend({ blue, red, profile, myRole, limit = 2 }) {
+  const analysis = analyzeDraft(blue, red);
+  const pool = buildPool({ blue, red, profile, myRole });
 
   const scored = pool
     .map((candidate) => {

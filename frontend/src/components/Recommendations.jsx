@@ -5,9 +5,18 @@ import { ChampionIcon } from "./ChampionIcon.jsx";
  * Renders the engine's draft analysis plus the top recommendations, filtered
  * through the user's personal profile.
  */
-export function Recommendations({ result, myRole, onRoleChange, roles, profileEmpty }) {
+export function Recommendations({
+  result,
+  myRole,
+  onRoleChange,
+  roles,
+  profileEmpty,
+  onPick = null,
+  myPickSet = false,
+}) {
   const { analysis, recommendations } = result;
   const needs = Object.values(analysis.needs);
+  const canPick = typeof onPick === "function";
 
   return (
     <aside className="reco-panel">
@@ -36,23 +45,50 @@ export function Recommendations({ result, myRole, onRoleChange, roles, profileEm
           already be drafted.
         </p>
       ) : (
-        <ol className="reco-list">
-          {recommendations.map((rec, i) => (
-            <li key={rec.name} className={`reco-card rank-${i + 1}`}>
-              <span className="rank">#{i + 1}</span>
-              <ChampionIcon name={rec.name} size={52} />
-              <div className="reco-body">
-                <div className="reco-title">
-                  <strong>{rec.name}</strong>
-                  <span className={`source-badge ${rec.source}`}>
-                    {rec.source === "main" ? "Main" : rec.archetype || "Pocket"}
-                  </span>
-                </div>
-                <p className="reco-reason">{rec.reason}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
+        <>
+          {canPick && !myPickSet && (
+            <p className="muted reco-hint">
+              Mark your pick slot (★) on Blue Team to fill it with one click.
+            </p>
+          )}
+          <ol className="reco-list">
+            {recommendations.map((rec, i) => {
+              const actionable = canPick && myPickSet;
+              const body = (
+                <>
+                  <span className="rank">#{i + 1}</span>
+                  <ChampionIcon name={rec.name} size={52} />
+                  <div className="reco-body">
+                    <div className="reco-title">
+                      <strong>{rec.name}</strong>
+                      <span className={`source-badge ${rec.source}`}>
+                        {rec.source === "main" ? "Main" : rec.archetype || "Pocket"}
+                      </span>
+                    </div>
+                    <p className="reco-reason">{rec.reason}</p>
+                  </div>
+                  {actionable && <span className="reco-use">Use ↵</span>}
+                </>
+              );
+              return (
+                <li key={rec.name} className={`reco-card rank-${i + 1}`}>
+                  {actionable ? (
+                    <button
+                      type="button"
+                      className="reco-card-btn"
+                      onClick={() => onPick(rec)}
+                      title={`Fill your pick with ${rec.name}`}
+                    >
+                      {body}
+                    </button>
+                  ) : (
+                    body
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </>
       )}
 
       <div className="analysis-block">
