@@ -26,8 +26,8 @@ function ChampionDatalist({ id }) {
  *   - Pocket Picks tagged by archetype/playstyle
  * Supports import/export of the raw JSON config.
  */
-export function ProfilePanel({ profile, setProfile }) {
-  const [open, setOpen] = useState(false);
+export function ProfilePanel({ profile, setProfile, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [mainDrafts, setMainDrafts] = useState({});
   const [pickName, setPickName] = useState("");
   const [pickArchetype, setPickArchetype] = useState(ARCHETYPES[0]);

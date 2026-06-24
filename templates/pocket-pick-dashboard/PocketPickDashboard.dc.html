@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Pocket Pick Dashboard" description="Premium esports draft companion — 3-column board with profile, live picks, and recommendations" -->
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="./ds-base.js"></script>
+<style>
+  @keyframes ppGlowPulse { 0%,100%{opacity:.65;transform:translate(-50%,-50%) scale(1)} 50%{opacity:1;transform:translate(-50%,-50%) scale(1.06)} }
+  @keyframes ppDot { 0%,100%{opacity:1} 50%{opacity:.35} }
+  body{margin:0;background:#0a0e17}
+</style>
+</helmet>
+<div data-screen-label="Pocket Pick Dashboard" style="min-height:100vh;background:var(--bg);font-family:Inter,system-ui,sans-serif;color:var(--text);-webkit-font-smoothing:antialiased">
+
+  <header style="position:sticky;top:0;z-index:50;height:56px;background:rgba(10,14,23,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border)">
+    <div style="max-width:1280px;height:100%;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:16px">
+      <div style="display:flex;align-items:baseline;gap:10px;min-width:240px">
+        <span style="font-size:17px;font-weight:700;letter-spacing:0.01em;color:var(--gold)">⚔ Pocket&nbsp;Pick</span>
+        <span style="font-size:11px;color:var(--muted);letter-spacing:0.02em">Draft Companion</span>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:4px;padding:4px;background:var(--bg-2);border:1px solid var(--border);border-radius:999px">
+        <sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ setLive }}" style="padding:5px 16px;border-radius:999px;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.01em;transition:all .15s ease;background:linear-gradient(135deg,#1d4ed8,var(--blue));color:#fff;box-shadow:0 2px 10px var(--blue-glow)">Live</button>
+        </sc-if>
+        <sc-if value="{{ isManual }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ setLive }}" style="padding:5px 16px;border-radius:999px;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.01em;transition:all .15s ease;background:transparent;color:var(--muted)">Live</button>
+        </sc-if>
+        <sc-if value="{{ isManual }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ setManual }}" style="padding:5px 16px;border-radius:999px;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.01em;transition:all .15s ease;background:linear-gradient(135deg,#1d4ed8,var(--blue));color:#fff;box-shadow:0 2px 10px var(--blue-glow)">Manual</button>
+        </sc-if>
+        <sc-if value="{{ isLive }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ setManual }}" style="padding:5px 16px;border-radius:999px;border:none;cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:0.01em;transition:all .15s ease;background:transparent;color:var(--muted)">Manual</button>
+        </sc-if>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;min-width:240px">
+        <span style="display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;letter-spacing:0.02em;background:rgba(52,211,153,0.10);color:var(--good);border:1px solid rgba(52,211,153,0.32)">
+          <span style="width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);animation:ppDot 1.6s ease-in-out infinite"></span>{{ statusText }}
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <main style="position:relative;max-width:1280px;margin:0 auto;padding:24px;display:grid;grid-template-columns:280px 1fr 320px;gap:20px;align-items:start">
+
+    <sc-if value="{{ glowBlue }}" hint-placeholder-val="{{ true }}">
+      <div style="position:absolute;left:50%;top:300px;width:640px;height:520px;transform:translate(-50%,-50%);background:radial-gradient(closest-side, var(--blue-glow), transparent 72%);filter:blur(14px);pointer-events:none;z-index:0;animation:ppGlowPulse 7s ease-in-out infinite"></div>
+    </sc-if>
+    <sc-if value="{{ glowGold }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;left:50%;top:300px;width:640px;height:520px;transform:translate(-50%,-50%);background:radial-gradient(closest-side, rgba(200,165,88,0.22), transparent 72%);filter:blur(14px);pointer-events:none;z-index:0;animation:ppGlowPulse 7s ease-in-out infinite"></div>
+    </sc-if>
+
+    <!-- LEFT: Profile -->
+    <aside style="position:relative;z-index:1;display:flex;flex-direction:column;gap:14px">
+      <div style="color:var(--gold);border-left:3px solid var(--gold);padding-left:10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em">Your Profile</div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);overflow:hidden">
+        <x-import component-from-global-scope="PocketPickUI.ProfilePanel" dc-props="{{ profileProps }}" hint-size="100%,420px"></x-import>
+      </div>
+    </aside>
+
+    <!-- CENTER: Draft board -->
+    <section style="position:relative;z-index:1;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);padding:22px 24px 26px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+        <div style="color:var(--gold);border-left:3px solid var(--gold);padding-left:10px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em">Draft Board</div>
+        <span style="font-size:11px;color:var(--muted);letter-spacing:0.02em">Patch 14.12 · Ranked Solo</span>
+      </div>
+
+      <!-- Blue side -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <span style="width:8px;height:8px;border-radius:2px;background:var(--blue);box-shadow:0 0 8px var(--blue-glow)"></span>
+        <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text)">Blue Side</span>
+        <span style="font-size:11px;color:var(--muted)">· Your Team</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+        <sc-for list="{{ blueSlots }}" as="s" hint-placeholder-count="5">
+          <div onClick="{{ s.onClick }}" style="display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer">
+            <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted)">{{ s.label }}</span>
+            <sc-if value="{{ s.name }}" hint-placeholder-val="{{ true }}">
+              <div style="display:inline-flex;border-radius:16px;transition:box-shadow .16s ease,transform .16s ease" style-hover="box-shadow:0 0 0 2px var(--blue), 0 0 22px var(--blue-glow);transform:translateY(-2px)">
+                <x-import component-from-global-scope="PocketPickUI.ChampionIcon" name="{{ s.name }}" size="{{ allySize }}" hint-size="72px,72px"></x-import>
+              </div>
+            </sc-if>
+            <sc-if value="{{ s.empty }}" hint-placeholder-val="{{ false }}">
+              <div style="width:72px;height:72px;border-radius:16px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center;transition:border-color .16s ease,box-shadow .16s ease;box-shadow:0 0 0 1px var(--blue-glow)" style-hover="border-color:var(--blue);box-shadow:0 0 18px var(--blue-glow)">
+                <span style="font-size:26px;font-weight:300;color:var(--muted);line-height:1">+</span>
+              </div>
+            </sc-if>
+            <span style="font-size:13px;font-weight:500;color:var(--text);min-height:16px">{{ s.champ }}</span>
+            <span style="font-size:10px;font-weight:600;letter-spacing:0.05em;padding:2px 9px;border-radius:999px;background:rgba(94,234,212,0.12);color:var(--accent);border:1px solid rgba(94,234,212,0.30)">{{ s.role }}</span>
+          </div>
+        </sc-for>
+      </div>
+
+      <!-- Gold divider -->
+      <div style="display:flex;align-items:center;gap:14px;margin:26px 0">
+        <div style="flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--gold))"></div>
+        <span style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:var(--gold)">VS</span>
+        <div style="flex:1;height:1px;background:linear-gradient(90deg,var(--gold),transparent)"></div>
+      </div>
+
+      <!-- Red side -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <span style="width:8px;height:8px;border-radius:2px;background:var(--red);box-shadow:0 0 8px var(--red-glow)"></span>
+        <span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text)">Red Side</span>
+        <span style="font-size:11px;color:var(--muted)">· Enemy</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">
+        <sc-for list="{{ redSlots }}" as="s" hint-placeholder-count="5">
+          <div onClick="{{ s.onClick }}" style="display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer">
+            <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.07em;color:var(--muted)">{{ s.label }}</span>
+            <sc-if value="{{ s.name }}" hint-placeholder-val="{{ true }}">
+              <div style="display:inline-flex;border-radius:14px;opacity:0.92;transition:opacity .16s ease,box-shadow .16s ease" style-hover="opacity:1;box-shadow:0 0 0 2px var(--red), 0 0 16px var(--red-glow)">
+                <x-import component-from-global-scope="PocketPickUI.ChampionIcon" name="{{ s.name }}" size="{{ enemySize }}" hint-size="56px,56px"></x-import>
+              </div>
+            </sc-if>
+            <sc-if value="{{ s.empty }}" hint-placeholder-val="{{ false }}">
+              <div style="width:56px;height:56px;border-radius:14px;border:2px dashed var(--border);display:flex;align-items:center;justify-content:center" style-hover="border-color:var(--red)">
+                <span style="font-size:22px;font-weight:300;color:var(--muted);line-height:1">+</span>
+              </div>
+            </sc-if>
+            <span style="font-size:13px;font-weight:500;color:var(--text);min-height:16px">{{ s.champ }}</span>
+            <span style="font-size:10px;font-weight:600;letter-spacing:0.05em;padding:2px 9px;border-radius:999px;background:rgba(134,147,173,0.10);color:var(--muted);border:1px solid var(--border)">{{ s.role }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <!-- RIGHT: Recommendations -->
+    <aside style="position:relative;z-index:1;display:flex;flex-direction:column;gap:14px">
+      <div style="color:var(--gold);border-left:3px solid var(--gold);padding-left:10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em">Recommendations</div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,0.05);overflow:hidden">
+        <x-import component-from-global-scope="PocketPickUI.Recommendations" dc-props="{{ recoProps }}" hint-size="100%,520px"></x-import>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Champion select overlay -->
+  <sc-if value="{{ modalProps }}" hint-placeholder-val="{{ false }}">
+    <x-import component-from-global-scope="PocketPickUI.ChampionSelectModal" dc-props="{{ modalProps }}" hint-size="100%,100%"></x-import>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:860},&quot;allySize&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:72,&quot;min&quot;:48,&quot;max&quot;:96,&quot;step&quot;:4,&quot;tsType&quot;:&quot;number&quot;},&quot;enemySize&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:72,&quot;min&quot;:40,&quot;max&quot;:80,&quot;step&quot;:4,&quot;tsType&quot;:&quot;number&quot;},&quot;boardGlow&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;Blue&quot;,&quot;options&quot;:[&quot;Blue&quot;,&quot;Gold&quot;,&quot;Off&quot;],&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = {
+    mode: 'manual',
+    myRole: 'ADC',
+    selected: null,
+    blue: ['Garen', 'Vi', 'Ahri', null, 'Thresh'],
+    red: ['Darius', 'Hecarim', 'Zed', 'Caitlyn', 'Lux'],
+    profile: {
+      mains: {
+        TOP: ['Garen', 'Darius'],
+        JUNGLE: ['Vi', 'Hecarim'],
+        MID: ['Ahri', 'Syndra'],
+        ADC: ['Jinx', 'Caitlyn'],
+        SUPPORT: ['Thresh', 'Lulu'],
+      },
+      pocketPicks: [
+        { name: 'Zed', archetype: 'Assassin' },
+        { name: 'Sivir', archetype: 'Teamfight' },
+        { name: 'Jhin', archetype: 'Poke' },
+      ],
+    },
+  };
+
+  ROLES = ['TOP', 'JUNGLE', 'MID', 'ADC', 'SUPPORT'];
+  SHORT = { TOP: 'TOP', JUNGLE: 'JG', MID: 'MID', ADC: 'ADC', SUPPORT: 'SUP' };
+
+  componentDidMount() {
+    let tries = 0;
+    this._t = setInterval(() => {
+      tries++;
+      const closed = document.querySelector('.profile-panel:not(.open) .profile-toggle');
+      if (closed) closed.click();
+      if (document.querySelector('.profile-panel.open') || tries > 30) clearInterval(this._t);
+    }, 120);
+  }
+  componentWillUnmount() { clearInterval(this._t); }
+
+  _fill(team, slot, name) {
+    this.setState((s) => {
+      const arr = s[team].slice();
+      arr[slot] = name;
+      return { [team]: arr, selected: null };
+    });
+  }
+
+  _result() {
+    return {
+      analysis: {
+        damageSplit: { ad: 3, ap: 1 },
+        needs: {
+          peel: { weight: 0.7, note: 'Peel / engage' },
+          tank: { weight: 0.5, note: 'Frontline needed' },
+        },
+        threats: ['Assassin', 'Dive'],
+      },
+      recommendations: [
+        { name: 'Jinx', source: 'main', archetype: null, reason: 'Strong AD carry that shores up your damage split. Late-game teamfight presence counters their dive comp.' },
+        { name: 'Caitlyn', source: 'pocket', archetype: 'Poke', reason: 'Long-range poke fills the gap in your teamfight setup and pressures their engage before it starts.' },
+      ],
+    };
+  }
+
+  renderVals() {
+    const { blue, red, selected, mode, myRole, profile } = this.state;
+    const allySize = this.props.allySize ?? 72;
+    const enemySize = this.props.enemySize ?? 56;
+    const boardGlow = this.props.boardGlow ?? 'Blue';
+    const myIdx = this.ROLES.indexOf(myRole);
+    const taken = new Set([...blue, ...red].filter(Boolean).map((n) => n.toLowerCase()));
+
+    const mkSlot = (team) => (name, i) => ({
+      name: name || undefined,
+      champ: name || '—',
+      empty: !name,
+      label: 'Pick ' + (i + 1),
+      role: this.SHORT[this.ROLES[i]],
+      onClick: () => this.setState({ selected: { team, slot: i } }),
+    });
+
+    const blueSlots = blue.map(mkSlot('blue'));
+    const redSlots = red.map(mkSlot('red'));
+
+    const modalProps = selected
+      ? {
+          team: selected.team,
+          slot: selected.slot,
+          taken,
+          onPick: (c) => this._fill(selected.team, selected.slot, c.name),
+          onClear: () => this._fill(selected.team, selected.slot, null),
+          onClose: () => this.setState({ selected: null }),
+        }
+      : null;
+
+    const recoProps = {
+      result: this._result(),
+      myRole,
+      roles: this.ROLES,
+      onRoleChange: (r) => this.setState({ myRole: r }),
+      profileEmpty: false,
+      onPick: (rec) => this._fill('blue', this.ROLES.indexOf(this.state.myRole), rec.name),
+      myPickSet: !!blue[myIdx],
+    };
+
+    const profileProps = {
+      profile,
+      setProfile: (p) => this.setState((s) => ({ profile: typeof p === 'function' ? p(s.profile) : p })),
+    };
+
+    return {
+      blueSlots,
+      redSlots,
+      modalProps,
+      recoProps,
+      profileProps,
+      allySize,
+      enemySize,
+      glowBlue: boardGlow === 'Blue',
+      glowGold: boardGlow === 'Gold',
+      setLive: () => this.setState({ mode: 'live' }),
+      setManual: () => this.setState({ mode: 'manual' }),
+      isLive: mode === 'live',
+      isManual: mode === 'manual',
+      statusText: mode === 'live' ? 'Live Draft' : 'Manual Draft',
+    };
+  }
+}
+</script>
+</body>
+</html>

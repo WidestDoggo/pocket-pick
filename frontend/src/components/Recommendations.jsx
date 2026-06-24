@@ -19,10 +19,10 @@ export function Recommendations({
   const canPick = typeof onPick === "function";
 
   return (
-    <aside className="reco-panel">
+    <div className="reco-panel">
       <div className="reco-header">
-        <h2>Recommendations</h2>
         <label className="role-select">
+          <span className="reco-role-label">Your role</span>
           Your role
           <select value={myRole} onChange={(e) => onRoleChange(e.target.value)}>
             {roles.map((r) => (
@@ -128,6 +128,6 @@ export function Recommendations({
           </span>
         </div>
       </div>
-    </aside>
+    </div>
   );
 }

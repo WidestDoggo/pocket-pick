@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ROLES, ROLE_LABELS, estimateRole } from "./champions.js";
+import { ROLES, estimateRole } from "./champions.js";
 import { recommend } from "./DraftEngine.js";
 import { useDraftSync } from "./useDraftSync.js";
 import { ChampionIcon } from "./components/ChampionIcon.jsx";
@@ -10,6 +10,8 @@ import { Recommendations } from "./components/Recommendations.jsx";
 const PROFILE_KEY = "lol-draft-companion:profile";
 const MODE_KEY = "lol-draft-companion:mode";
 const MY_PICK_KEY = "lol-draft-companion:myPick";
+
+const ROLE_SHORT = { TOP: "TOP", JUNGLE: "JG", MID: "MID", ADC: "ADC", SUPPORT: "SUP" };
 
 const EMPTY_PROFILE = {
   mains: { TOP: [], JUNGLE: [], MID: [], ADC: [], SUPPORT: [] },
@@ -32,8 +34,6 @@ function loadProfile() {
   }
 }
 
-// Convert the backend's live slot payload into the {name, riotId, role} shape
-// the rest of the app uses. Roles are estimated greedily in pick order.
 function liveTeamToBoard(slots) {
   const used = [];
   return Array.from({ length: 5 }, (_, i) => {
@@ -49,25 +49,18 @@ export default function App() {
   const [mode, setMode] = useState(() => localStorage.getItem(MODE_KEY) || "manual");
   const [profile, setProfile] = useState(loadProfile);
   const [myRole, setMyRole] = useState("MID");
-
-  // Manual-mode boards (local, editable).
   const [manualBlue, setManualBlue] = useState(emptyTeam);
   const [manualRed, setManualRed] = useState(emptyTeam);
-
-  // Which Blue pick slot is "mine" (manual mode). null = none designated.
   const [myPickIndex, setMyPickIndex] = useState(() => {
     const raw = localStorage.getItem(MY_PICK_KEY);
     const n = raw == null ? NaN : Number(raw);
     return Number.isInteger(n) && n >= 0 && n < 5 ? n : null;
   });
-
-  // Modal state for manual champion selection.
-  const [modal, setModal] = useState(null); // { team, slot } | null
+  const [modal, setModal] = useState(null);
 
   const isLive = mode === "live";
   const { state: liveState } = useDraftSync(isLive);
 
-  // Persist profile + mode.
   useEffect(() => {
     localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
   }, [profile]);
@@ -79,7 +72,6 @@ export default function App() {
     else localStorage.setItem(MY_PICK_KEY, String(myPickIndex));
   }, [myPickIndex]);
 
-  // The board shown + analyzed depends on the active mode.
   const blue = isLive ? liveTeamToBoard(liveState.blue) : manualBlue;
   const red = isLive ? liveTeamToBoard(liveState.red) : manualRed;
 
@@ -98,9 +90,8 @@ export default function App() {
     profile.pocketPicks.length === 0 &&
     Object.values(profile.mains).every((arr) => arr.length === 0);
 
-  // --- Manual editing handlers ---------------------------------------------
   const openSlot = (team, slot) => {
-    if (isLive) return; // read-only in live mode
+    if (isLive) return;
     setModal({ team, slot });
   };
 
@@ -109,8 +100,6 @@ export default function App() {
     const setter = modal.team === "blue" ? setManualBlue : setManualRed;
     setter((prev) => {
       const next = [...prev];
-      // Auto-estimate the role from the champion + roles already on this team
-      // (the user can override it via the per-slot dropdown).
       const used = next
         .filter((s, i) => s && i !== modal.slot)
         .map((s) => s.role)
@@ -119,7 +108,6 @@ export default function App() {
       next[modal.slot] = { name: champ.name, riotId: champ.riotId, role };
       return next;
     });
-    // Auto-sync "Your role" when filling your own designated pick slot.
     if (modal.team === "blue" && modal.slot === myPickIndex) {
       const used = manualBlue
         .filter((s, i) => s && i !== modal.slot)
@@ -139,12 +127,9 @@ export default function App() {
       if (next[slot]) next[slot] = { ...next[slot], role };
       return next;
     });
-    // One source of truth: editing your own slot's role updates "Your role".
     if (team === "blue" && slot === myPickIndex && role) setMyRole(role);
   };
 
-  // --- "My pick" handlers ---------------------------------------------------
-  // Designate which Blue slot is mine; adopt its role if it already has one.
   const setMyPick = (slot) => {
     if (isLive) return;
     setMyPickIndex((prev) => (prev === slot ? null : slot));
@@ -152,7 +137,6 @@ export default function App() {
     if (slotRole) setMyRole(slotRole);
   };
 
-  // "Your role" selector — also mirror onto the designated slot (if filled).
   const changeMyRole = (role) => {
     setMyRole(role);
     if (myPickIndex != null && manualBlue[myPickIndex]) {
@@ -160,7 +144,6 @@ export default function App() {
     }
   };
 
-  // Fill the designated slot with a recommended champion.
   const fillMyPick = (rec) => {
     if (isLive || myPickIndex == null) return;
     setManualBlue((prev) => {
@@ -175,8 +158,6 @@ export default function App() {
     });
   };
 
-  // Swap my pick position with another Blue slot — champions trade places and
-  // the "YOU" marker follows me to the new position (mirrors a champ-select swap).
   const swapPick = (targetSlot) => {
     if (isLive || myPickIndex == null || targetSlot === myPickIndex) return;
     setManualBlue((prev) => {
@@ -205,10 +186,10 @@ export default function App() {
   };
 
   const statusBadge = () => {
-    if (!isLive) return { label: "Manual Mode", cls: "manual" };
+    if (!isLive) return { label: "Manual Draft", cls: "good" };
     switch (liveState.status) {
       case "live":
-        return { label: "Live · Champ Select", cls: "live" };
+        return { label: "Live Draft", cls: "good" };
       case "no-session":
         return { label: "Client open · No champ select", cls: "warn" };
       case "error":
@@ -220,93 +201,144 @@ export default function App() {
   const badge = statusBadge();
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <div className="brand">
-          <span className="brand-mark">⟡</span>
-          <div>
-            <h1>Draft Companion</h1>
-            <p className="tagline">Personalized League of Legends draft assistant</p>
+    <div className="app-screen">
+      <header className="pp-header">
+        <div className="pp-header-inner">
+          <div className="pp-brand">
+            <span className="pp-brand-title">⚔ Pocket&nbsp;Pick</span>
+            <span className="pp-brand-sub">Draft Companion</span>
           </div>
-        </div>
 
-        <div className="mode-toggle">
-          <span className={!isLive ? "active" : ""}>Manual Desktop</span>
-          <button
-            className={`switch ${isLive ? "on" : ""}`}
-            role="switch"
-            aria-checked={isLive}
-            onClick={() => setMode(isLive ? "manual" : "live")}
-          >
-            <span className="knob" />
-          </button>
-          <span className={isLive ? "active" : ""}>LCU Live Sync</span>
-        </div>
+          <div className="pp-mode-pill">
+            <button
+              type="button"
+              className={`pp-mode-btn ${isLive ? "active" : ""}`}
+              onClick={() => setMode("live")}
+            >
+              Live
+            </button>
+            <button
+              type="button"
+              className={`pp-mode-btn ${!isLive ? "active" : ""}`}
+              onClick={() => setMode("manual")}
+            >
+              Manual
+            </button>
+          </div>
 
-        <div className={`status-pill ${badge.cls}`}>
-          <span className="dot" />
-          {badge.label}
+          <div className="pp-header-status">
+            <span className={`pp-status-pill ${badge.cls}`}>
+              <span className="pp-status-dot" />
+              {badge.label}
+            </span>
+          </div>
         </div>
       </header>
 
       {isLive && liveState.status !== "live" && (
-        <div className="banner">
+        <div className="pp-banner">
           {liveState.message} You can switch to{" "}
-          <button className="linklike" onClick={() => setMode("manual")}>
-            Manual Desktop Mode
+          <button type="button" className="linklike" onClick={() => setMode("manual")}>
+            Manual Mode
           </button>{" "}
           to draft by hand.
         </div>
       )}
 
-      <ProfilePanel profile={profile} setProfile={setProfile} />
+      <main className="pp-main">
+        {isLive ? (
+          <div className="pp-glow pp-glow-blue" aria-hidden />
+        ) : (
+          <div className="pp-glow pp-glow-gold" aria-hidden />
+        )}
 
-      <main className="board-area">
-        <div className="teams">
-          <TeamColumn
-            title="Blue Team"
-            subtitle="Allies · set your teammates' roles"
-            color="blue"
-            slots={blue}
-            readOnly={isLive}
-            onSlotClick={(slot) => openSlot("blue", slot)}
-            onRoleChange={(slot, role) => setSlotRole("blue", slot, role)}
-            highlightSelf={isLive ? liveState.blue : null}
-            myPickIndex={isLive ? null : myPickIndex}
-            onSetMyPick={isLive ? null : setMyPick}
-            onSwap={isLive ? null : swapPick}
-          />
-          <div className="versus">VS</div>
-          <TeamColumn
-            title="Red Team"
-            subtitle="Enemies · roles auto-estimated"
-            color="red"
-            slots={red}
-            readOnly={isLive}
-            onSlotClick={(slot) => openSlot("red", slot)}
-            onRoleChange={(slot, role) => setSlotRole("red", slot, role)}
-            highlightSelf={isLive ? liveState.red : null}
-          />
-        </div>
+        <aside className="pp-sidebar pp-sidebar-left">
+          <div className="pp-section-label">Your Profile</div>
+          <div className="pp-panel-card">
+            <ProfilePanel profile={profile} setProfile={setProfile} defaultOpen />
+          </div>
+        </aside>
 
-        <Recommendations
-          result={result}
-          myRole={myRole}
-          onRoleChange={changeMyRole}
-          roles={ROLES}
-          profileEmpty={profileEmpty}
-          onPick={isLive ? null : fillMyPick}
-          myPickSet={!isLive && myPickIndex != null}
-        />
+        <section className="pp-board">
+          <div className="pp-board-header">
+            <div className="pp-section-label">Draft Board</div>
+            <div className="pp-board-actions">
+              {!isLive && (
+                <button type="button" className="btn ghost small" onClick={resetManual}>
+                  Reset
+                </button>
+              )}
+              <span className="muted pp-board-meta">Pick order · Ranked Solo</span>
+            </div>
+          </div>
+
+          <div className="pp-team-label pp-team-blue">
+            <span className="pp-team-dot" />
+            <span className="pp-team-name">Blue Side</span>
+            <span className="muted">· Your Team</span>
+          </div>
+          <div className="pp-slots-grid">
+            {blue.map((champ, i) => (
+              <DraftSlot
+                key={`b-${i}`}
+                index={i}
+                champ={champ}
+                team="blue"
+                size={72}
+                readOnly={isLive}
+                isSelf={(isLive && liveState.blue?.[i]?.isSelf) || i === myPickIndex}
+                canMark={!isLive}
+                myPickIndex={myPickIndex}
+                onSlotClick={() => openSlot("blue", i)}
+                onSetMyPick={() => setMyPick(i)}
+                onSwap={() => swapPick(i)}
+                onRoleChange={(role) => setSlotRole("blue", i, role)}
+              />
+            ))}
+          </div>
+
+          <div className="pp-vs">
+            <div className="pp-vs-line" />
+            <span className="pp-vs-text">VS</span>
+            <div className="pp-vs-line pp-vs-line-right" />
+          </div>
+
+          <div className="pp-team-label pp-team-red">
+            <span className="pp-team-dot" />
+            <span className="pp-team-name">Red Side</span>
+            <span className="muted">· Enemy</span>
+          </div>
+          <div className="pp-slots-grid pp-slots-enemy">
+            {red.map((champ, i) => (
+              <DraftSlot
+                key={`r-${i}`}
+                index={i}
+                champ={champ}
+                team="red"
+                size={56}
+                readOnly={isLive}
+                onSlotClick={() => openSlot("red", i)}
+                onRoleChange={(role) => setSlotRole("red", i, role)}
+              />
+            ))}
+          </div>
+        </section>
+
+        <aside className="pp-sidebar pp-sidebar-right">
+          <div className="pp-section-label">Recommendations</div>
+          <div className="pp-panel-card">
+            <Recommendations
+              result={result}
+              myRole={myRole}
+              onRoleChange={changeMyRole}
+              roles={ROLES}
+              profileEmpty={profileEmpty}
+              onPick={isLive ? null : fillMyPick}
+              myPickSet={!isLive && myPickIndex != null}
+            />
+          </div>
+        </aside>
       </main>
-
-      {!isLive && (
-        <div className="board-actions">
-          <button className="btn ghost" onClick={resetManual}>
-            Reset Board
-          </button>
-        </div>
-      )}
 
       {modal && (
         <ChampionSelectModal
@@ -318,107 +350,94 @@ export default function App() {
           onClose={() => setModal(null)}
         />
       )}
-
-      <footer className="app-footer">
-        <span>
-          {isLive
-            ? "Live Sync reads champ select from your local League client."
-            : "Manual Mode runs fully offline — click any slot to draft."}
-        </span>
-      </footer>
     </div>
   );
 }
 
-function TeamColumn({
-  title,
-  subtitle,
-  color,
-  slots,
+function DraftSlot({
+  index,
+  champ,
+  team,
+  size,
   readOnly,
-  onSlotClick,
-  onRoleChange,
-  highlightSelf,
+  isSelf = false,
+  canMark = false,
   myPickIndex = null,
-  onSetMyPick = null,
-  onSwap = null,
+  onSlotClick,
+  onSetMyPick,
+  onSwap,
+  onRoleChange,
 }) {
-  const canMark = !readOnly && typeof onSetMyPick === "function";
+  const isAlly = team === "blue";
+  const hasMyPick = myPickIndex != null;
+  const showSwap = canMark && hasMyPick && index !== myPickIndex;
+
   return (
-    <section className={`team-column ${color}`}>
-      <header className="team-header">
-        <h2>{title}</h2>
-        <span className="team-sub">{subtitle}</span>
-      </header>
-      <ul className="slot-list">
-        {slots.map((champ, i) => {
-          // "YOU" comes from live self-detection, or the manually designated pick.
-          const isSelf = highlightSelf?.[i]?.isSelf || i === myPickIndex;
-          const hasMyPick = myPickIndex != null;
-          return (
-            <li key={i} className="slot-row">
-              {canMark && (
-                <button
-                  className={`set-pick-btn ${i === myPickIndex ? "active" : ""}`}
-                  onClick={() => onSetMyPick(i)}
-                  title={i === myPickIndex ? "This is your pick (click to clear)" : "Set as my pick"}
-                  aria-pressed={i === myPickIndex}
-                >
-                  {i === myPickIndex ? "★" : "☆"}
-                </button>
-              )}
-              <button
-                className={`draft-slot ${champ ? "filled" : "empty"} ${
-                  readOnly ? "readonly" : ""
-                } ${isSelf ? "self" : ""}`}
-                onClick={() => onSlotClick(i)}
-                disabled={readOnly}
-              >
-                <ChampionIcon name={champ?.name} size={48} />
-                <div className="slot-text">
-                  <span className="slot-role">Pick {i + 1}</span>
-                  <span className="slot-name">
-                    {champ ? champ.name : readOnly ? "—" : "Empty · click to pick"}
-                  </span>
-                </div>
-                {isSelf && <span className="you-badge">YOU</span>}
-              </button>
+    <div className={`pp-slot ${isAlly ? "pp-slot-ally" : "pp-slot-enemy"}`}>
+      <div className="pp-slot-top">
+        <span className="pp-slot-pick">Pick {index + 1}</span>
+        {canMark && (
+          <button
+            type="button"
+            className={`pp-my-pick-btn ${index === myPickIndex ? "active" : ""}`}
+            onClick={onSetMyPick}
+            title={index === myPickIndex ? "Your pick (click to clear)" : "Set as my pick"}
+            aria-pressed={index === myPickIndex}
+          >
+            {index === myPickIndex ? "★" : "☆"}
+          </button>
+        )}
+        {showSwap && (
+          <button
+            type="button"
+            className="pp-swap-btn"
+            onClick={onSwap}
+            title="Swap your pick position with this slot"
+            aria-label={`Swap with Pick ${index + 1}`}
+          >
+            ⇄
+          </button>
+        )}
+      </div>
 
-              {canMark && hasMyPick && i !== myPickIndex && (
-                <button
-                  className="swap-btn"
-                  onClick={() => onSwap(i)}
-                  title="Swap your pick position with this slot"
-                  aria-label={`Swap your pick position with Pick ${i + 1}`}
-                >
-                  ⇄
-                </button>
-              )}
+      <button
+        type="button"
+        className={`pp-slot-icon-btn ${champ ? "filled" : "empty"} ${readOnly ? "readonly" : ""} ${isSelf ? "self" : ""}`}
+        onClick={onSlotClick}
+        disabled={readOnly}
+      >
+        {champ ? (
+          <ChampionIcon name={champ.name} size={size} />
+        ) : (
+          <span className="pp-slot-empty" style={{ width: size, height: size }}>
+            +
+          </span>
+        )}
+        {isSelf && <span className="pp-you-badge">YOU</span>}
+      </button>
 
-              {champ &&
-                (readOnly ? (
-                  <span className="role-tag" title="Estimated role">
-                    {ROLE_LABELS[champ.role] || "?"}
-                  </span>
-                ) : (
-                  <select
-                    className="slot-role-select"
-                    value={champ.role || ""}
-                    onChange={(e) => onRoleChange(i, e.target.value)}
-                    title="Role"
-                  >
-                    {!champ.role && <option value="">Role…</option>}
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABELS[r]}
-                      </option>
-                    ))}
-                  </select>
-                ))}
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+      <span className="pp-slot-name">{champ ? champ.name : "—"}</span>
+
+      {champ &&
+        (readOnly ? (
+          <span className={`pp-role-pill ${isAlly ? "ally" : "enemy"}`}>
+            {ROLE_SHORT[champ.role] || "?"}
+          </span>
+        ) : (
+          <select
+            className={`pp-role-select ${isAlly ? "ally" : "enemy"}`}
+            value={champ.role || ""}
+            onChange={(e) => onRoleChange(e.target.value)}
+            title="Role"
+          >
+            {!champ.role && <option value="">Role…</option>}
+            {ROLES.map((r) => (
+              <option key={r} value={r}>
+                {ROLE_SHORT[r]}
+              </option>
+            ))}
+          </select>
+        ))}
+    </div>
   );
 }
