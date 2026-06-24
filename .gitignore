@@ -23,3 +23,8 @@ npm-debug.log*
 .env
 draft-profile.json
 
+# Design sync — generated output and converter scripts (not committed)
+ds-bundle/
+.ds-sync/
+.design-sync/.cache/
+

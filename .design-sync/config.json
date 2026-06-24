@@ -1,0 +1,21 @@
+{
+  "projectId": "0f4154d0-5338-489a-bd07-f0407a7c993e",
+  "pkg": "lol-draft-companion-frontend",
+  "globalName": "PocketPickUI",
+  "shape": "package",
+  "cssEntry": "src/styles.css",
+  "buildCmd": "node .ds-sync/package-build.mjs --config .design-sync/config.json --node-modules frontend/node_modules --entry frontend/src/index.js --out ./ds-bundle",
+  "runtimeFontPrefixes": ["Inter"],
+  "overrides": {
+    "ChampionIcon": { "cardMode": "column" },
+    "ChampionSelectModal": { "cardMode": "single", "viewport": { "width": 860, "height": 800 } },
+    "ProfilePanel": { "cardMode": "single", "viewport": { "width": 860, "height": 800 } }
+  },
+  "readmeHeader": ".design-sync/conventions.md",
+  "componentSrcMap": {
+    "ChampionIcon": "src/components/ChampionIcon.jsx",
+    "ChampionSelectModal": "src/components/ChampionSelectModal.jsx",
+    "ProfilePanel": "src/components/ProfilePanel.jsx",
+    "Recommendations": "src/components/Recommendations.jsx"
+  }
+}
